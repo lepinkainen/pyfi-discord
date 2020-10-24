@@ -2,7 +2,7 @@
     "name": "pyfi-discord",
     "version": "1.0.0",
     "description": "Pyfibot Discord connection module",
-    "main": "index.js",
+    "main": "dist/app.js",
     "dependencies": {
         "@types/node": "^14.14.2",
         "@types/ws": "^7.2.7",
