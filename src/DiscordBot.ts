@@ -1,4 +1,5 @@
 import { Client, Message } from 'discord.js';
+import axios from 'axios';
 
 export class DiscordBot {
     private static instance: DiscordBot;
@@ -38,6 +39,45 @@ export class DiscordBot {
         });
     }
 
+    /**
+     * Calls external API hosted in AWS Lambda to resolve commands
+     * 
+     * @param message discord.js message object
+     * @param command command
+     * @param args arguments to command
+     */
+    private async pyfiCommand(message: Message, command: string, args: string[]): Promise<boolean> {
+        console.debug("External command '" + command + "' called with arguments: '" + args + "'");
+
+        const lambdafunc = process.env.LAMBDA_URL ?? ""
+        const headers = { 'x-api-key': process.env.LAMBDA_APIKEY }
+
+        const res = await axios.post(lambdafunc, {
+            'command': command,
+            'args': args.join(' '),
+            //'source': message.channel?.name,
+            'user': message.author.username,
+        }, {
+            headers: headers
+        });
+
+        console.debug(res);
+
+        // The API will always return 200, but errorType and errorMessage 
+        // will be populated if there is an error
+        if (res.status === 200 && res.data.errorType === undefined) {
+            console.debug("Got reply from external command")
+            message.reply(res.data.result || "API Error"); // just in case, discord.js will hard exit if reply content is undefined
+            return true;
+        }
+
+        console.info("No external command matched, returning to main flow")
+        return false;
+    }
+
+    /**
+     * Set the on message handler in discord.js
+     */
     private setMessageHandler(): void {
         this.client.on('message', async (message: Message) => {
             //* filters out requests from bots
@@ -52,6 +92,12 @@ export class DiscordBot {
 
             const args = message.content.slice(prefix.length).trim().split(' ');
             const command = args.shift()?.toLowerCase();
+
+            // Check external command service first, if it matches, we stop processing
+            if (command !== undefined && await this.pyfiCommand(message, command, args)) {
+                console.debug("External handler matched, abort further handling");
+                return;
+            }
 
             if (command === 'ping') {
                 await message.reply('Pong! (' + args + ')');
