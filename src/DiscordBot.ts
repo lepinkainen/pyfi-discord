@@ -43,9 +43,22 @@ export class DiscordBot {
             //* filters out requests from bots
             if (message.author.bot) return;
 
-            if (message.content === 'ping') {
-                await message.reply('Pong!');
+            const prefix = process.env.PREFIX ?? "."
+
+            // Not our prefix, we don't care
+            if (!message.content.startsWith(prefix)) return;
+
+            console.debug("Command message: " + JSON.stringify(message.toJSON()));
+
+            const args = message.content.slice(prefix.length).trim().split(' ');
+            const command = args.shift()?.toLowerCase();
+
+            if (command === 'ping') {
+                await message.reply('Pong! (' + args + ')');
+                return;
             }
+
+            console.debug("ERROR: Unknown command: " + JSON.stringify(message.toJSON()));
         });
     };
 }
