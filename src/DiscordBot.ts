@@ -66,6 +66,9 @@ export class DiscordBot {
         // The API will always return 200, but errorType and errorMessage 
         // will be populated if there is an error
         if (res.status === 200 && res.data.errorType === undefined) {
+            const apiresult = res.data.result as string;
+            if (apiresult.startsWith("Unknown command:")) return false;
+
             console.debug("Got reply from external command")
             message.reply(res.data.result || "API Error"); // just in case, discord.js will hard exit if reply content is undefined
             return true;
