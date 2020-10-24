@@ -36,7 +36,7 @@ export class DiscordBot {
         this.client.on('ready', () => {
             console.log(`Logged in as ${this.client.user?.tag}!`);
         });
-    };
+    }
 
     private setMessageHandler(): void {
         this.client.on('message', async (message: Message) => {
@@ -60,5 +60,5 @@ export class DiscordBot {
 
             console.debug("ERROR: Unknown command: " + JSON.stringify(message.toJSON()));
         });
-    };
+    }
 }
