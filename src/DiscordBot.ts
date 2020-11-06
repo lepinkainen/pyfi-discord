@@ -70,7 +70,13 @@ export class DiscordBot {
             if (apiresult.startsWith("Unknown command:")) return false;
 
             console.debug("Got reply from external command")
-            message.reply(res.data.result || "API Error"); // just in case, discord.js will hard exit if reply content is undefined
+            // just in case, discord.js will hard exit if reply content is undefined
+            if (res.data.result !== undefined && res.data.result !== "") {
+                message.reply(res.data.result);
+            } else {
+                console.warn("Invalid command called on backend: ", command);
+            }
+
             return true;
         }
 
