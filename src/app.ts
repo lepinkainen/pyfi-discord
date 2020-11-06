@@ -1,7 +1,8 @@
-import { DiscordBot } from './DiscordBot';
+import { DiscordBot } from './DiscordBot'
+import * as dotenv from 'dotenv'
 
-require('dotenv').config();
+dotenv.config()
 
-const bot = DiscordBot.getInstance();
+const bot = DiscordBot.getInstance()
 
-bot.connect();
+bot.connect()
