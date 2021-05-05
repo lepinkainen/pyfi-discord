@@ -3,7 +3,7 @@ pull_request_rules:
     conditions:
       - author=dependabot[bot]
       - check-success=build (12.x)
-      - check-success=Node.js CI / build (14.x)
+      - check-success=build (14.x)
       - base=master
     actions:
       merge:
