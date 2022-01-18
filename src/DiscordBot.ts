@@ -4,7 +4,7 @@ import axios from 'axios';
 export class DiscordBot {
     private static instance: DiscordBot;
 
-    private client: Client = new Client();
+    private client: Client = new Client({ intents: ['GUILD_MESSAGES'] });
 
     private constructor() {
         this.initializeClient();
