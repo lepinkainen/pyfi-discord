@@ -4,7 +4,7 @@
     "description": "Pyfibot Discord connection module",
     "main": "dist/app.js",
     "engines": {
-        "node": "16.x"
+        "node": ">=16.6.0"
     },
     "dependencies": {
         "@types/node": "^17.0.9",
