@@ -50,7 +50,7 @@ export class DiscordBot {
         console.debug("External command '" + command + "' called with arguments: '" + args + "'");
 
         const lambdafunc = process.env.LAMBDA_URL ?? ""
-        const headers = { 'x-api-key': process.env.LAMBDA_APIKEY }
+        const headers = { "x-api-key": process.env.LAMBDA_APIKEY ?? "" }
 
         const res = await axios.post(lambdafunc, {
             'command': command,
