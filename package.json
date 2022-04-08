@@ -8,7 +8,7 @@
     },
     "dependencies": {
         "@types/node": "^17.0.23",
-        "@types/ws": "^8.2.2",
+        "@types/ws": "8",
         "axios": "^0.26.1",
         "bufferutil": "^4.0.6",
         "discord.js": "^13.6.0",
@@ -19,9 +19,9 @@
         "standard": "^16.0.4",
         "ts-loader": "9",
         "typescript": "^4.6.3",
-        "utf-8-validate": "^5.0.8",
+        "utf-8-validate": "5",
         "webpack": "^5.72.0",
-        "yarn": "^1.22.17",
+        "yarn": "1",
         "zlib-sync": "^0.1.7"
     },
     "scripts": {
