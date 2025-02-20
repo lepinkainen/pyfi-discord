@@ -1,11 +1,32 @@
-import { Client, Message, GatewayIntentBits } from "discord.js";
+import {
+  Client,
+  GatewayIntentBits,
+  REST,
+  Routes,
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  Collection,
+  ApplicationCommandDataResolvable,
+} from "discord.js";
 import axios from "axios";
 
 export class DiscordBot {
   private static instance: DiscordBot;
+  private commands: Collection<
+    string,
+    (interaction: ChatInputCommandInteraction) => Promise<void>
+  > = new Collection();
 
   private client: Client = new Client({
-    intents: [GatewayIntentBits.GuildMessages],
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.DirectMessages,
+      GatewayIntentBits.DirectMessageReactions,
+      GatewayIntentBits.DirectMessageTyping,
+      GatewayIntentBits.GuildMembers,
+    ],
   });
 
   private constructor() {
@@ -19,20 +40,100 @@ export class DiscordBot {
     return DiscordBot.instance;
   }
 
-  connect(): void {
+  private validateEnvironment(): void {
+    const required = ["DISCORD_KEY", "CLIENT_ID", "GUILD_ID"];
+    const missing = required.filter((key) => !process.env[key]);
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required environment variables: ${missing.join(", ")}`
+      );
+    }
+  }
+
+  async connect(): Promise<void> {
+    this.validateEnvironment();
+    await this.registerSlashCommands();
+
     this.client
       .login(process.env.DISCORD_KEY)
-      .then((result) => console.log("Connected to Discord: " + result))
+      .then(() => console.log("Connected to Discord"))
       .catch((error) =>
         console.error(`Could not connect. Error: ${error.message}`)
       );
   }
 
+  private async registerSlashCommands(): Promise<void> {
+    const commands: ApplicationCommandDataResolvable[] = [
+      new SlashCommandBuilder()
+        .setName("weather")
+        .setDescription("Replies with Weather")
+        .toJSON(),
+      new SlashCommandBuilder()
+        .setName("help")
+        .setDescription("Shows all available commands")
+        .toJSON(),
+      // Add more slash commands here
+    ];
+
+    try {
+      if (!process.env.DISCORD_KEY) {
+        throw new Error("DISCORD_KEY is not defined");
+      }
+      if (!process.env.CLIENT_ID) {
+        throw new Error("CLIENT_ID is not defined");
+      }
+      if (!process.env.GUILD_ID) {
+        throw new Error("GUILD_ID is not defined");
+      }
+
+      const rest = new REST().setToken(process.env.DISCORD_KEY);
+      console.log("Started refreshing guild (/) commands.");
+
+      // Register commands for a specific guild instead of globally
+      await rest.put(
+        Routes.applicationGuildCommands(
+          process.env.CLIENT_ID,
+          process.env.GUILD_ID
+        ),
+        { body: commands }
+      );
+
+      console.log("Successfully reloaded guild (/) commands.");
+    } catch (error) {
+      console.error("Error registering commands:", error);
+    }
+  }
+
   private initializeClient(): void {
     if (!this.client) return;
 
+    this.registerCommandHandlers();
     this.setReadyHandler();
-    this.setMessageHandler();
+    this.setInteractionHandler();
+  }
+
+  private registerCommandHandlers(): void {
+    this.commands.set(
+      "ping",
+      async (interaction: ChatInputCommandInteraction) => {
+        await interaction.reply("Pong!");
+      }
+    );
+
+    this.commands.set(
+      "help",
+      async (interaction: ChatInputCommandInteraction) => {
+        const helpMessage = [
+          "**Available Commands:**",
+          `/ping - Check if bot is responsive`,
+          `/help - Show this help message`,
+          // Add more command descriptions here
+        ].join("\n");
+
+        await interaction.reply(helpMessage);
+      }
+    );
   }
 
   private setReadyHandler(): void {
@@ -43,94 +144,87 @@ export class DiscordBot {
 
   /**
    * Calls external API hosted in AWS Lambda to resolve commands
-   *
-   * @param message discord.js message object
-   * @param command command
-   * @param args arguments to command
    */
   private async pyfiCommand(
-    message: Message,
+    interaction: ChatInputCommandInteraction,
     command: string,
-    args: string[]
+    args: string
   ): Promise<boolean> {
-    console.debug(
-      "External command '" + command + "' called with arguments: '" + args + "'"
-    );
+    try {
+      console.debug(
+        `External command '${command}' called with arguments: '${args}'`
+      );
 
-    const lambdafunc = process.env.LAMBDA_URL ?? "";
-    const headers = { "x-api-key": process.env.LAMBDA_APIKEY ?? "" };
+      const lambdafunc = process.env.LAMBDA_URL ?? "";
+      const headers = { "x-api-key": process.env.LAMBDA_APIKEY ?? "" };
 
-    const res = await axios.post(
-      lambdafunc,
-      {
-        command: command,
-        args: args.join(" "),
-        //'source': message.channel?.name,
-        user: message.author.username,
-      },
-      {
-        headers: headers,
-      }
-    );
+      const res = await axios.post(
+        lambdafunc,
+        {
+          command: command,
+          args: args,
+          user: interaction.user.username,
+        },
+        {
+          headers: headers,
+          timeout: 5000,
+        }
+      );
 
-    console.debug(res);
+      if (res.status === 200 && res.data.errorType === undefined) {
+        const apiresult = res.data.result as string;
+        if (apiresult.startsWith("Unknown command:")) return false;
 
-    // The API will always return 200, but errorType and errorMessage
-    // will be populated if there is an error
-    if (res.status === 200 && res.data.errorType === undefined) {
-      const apiresult = res.data.result as string;
-      if (apiresult.startsWith("Unknown command:")) return false;
-
-      console.debug("Got reply from external command");
-      // just in case, discord.js will hard exit if reply content is undefined
-      if (res.data.result !== undefined && res.data.result !== "") {
-        message.reply(res.data.result);
-      } else {
-        console.warn("Invalid command called on backend: ", command);
+        if (res.data.result !== undefined && res.data.result !== "") {
+          await interaction.reply(res.data.result);
+        } else {
+          console.warn("Invalid command called on backend: ", command);
+        }
+        return true;
       }
 
+      console.info("No external command matched, returning to main flow");
+      return false;
+    } catch (error) {
+      console.error(`Error executing command ${command}:`, error);
+      await interaction.reply({
+        content: "Sorry, there was an error processing your command.",
+        ephemeral: true,
+      });
       return true;
     }
-
-    console.info("No external command matched, returning to main flow");
-    return false;
   }
 
-  /**
-   * Set the on message handler in discord.js
-   */
-  private setMessageHandler(): void {
-    this.client.on("message", async (message: Message) => {
-      //* filters out requests from bots
-      if (message.author.bot) return;
+  private setInteractionHandler(): void {
+    this.client.on("interactionCreate", async (interaction) => {
+      if (!interaction.isChatInputCommand()) return;
 
-      const prefix = process.env.PREFIX ?? ".";
+      const command = interaction.commandName;
 
-      // Not our prefix, we don't care
-      if (!message.content.startsWith(prefix)) return;
-
-      console.debug("Command message: " + JSON.stringify(message.toJSON()));
-
-      const args = message.content.slice(prefix.length).trim().split(" ");
-      const command = args.shift()?.toLowerCase();
-
-      // Check external command service first, if it matches, we stop processing
+      // Check external commands first
       if (
-        command !== undefined &&
-        (await this.pyfiCommand(message, command, args))
+        await this.pyfiCommand(
+          interaction,
+          command,
+          interaction.options.getString("args") ?? ""
+        )
       ) {
-        console.debug("External handler matched, abort further handling");
         return;
       }
 
-      if (command === "ping") {
-        await message.reply("Pong! (" + args + ")");
-        return;
+      // Check internal commands
+      const commandHandler = this.commands.get(command);
+      if (commandHandler) {
+        try {
+          await commandHandler(interaction);
+        } catch (error) {
+          console.error(`Error executing command ${command}:`, error);
+          await interaction.reply({
+            content: "An error occurred while executing the command.",
+            ephemeral: true,
+          });
+        }
       }
-
-      console.debug(
-        "ERROR: Unknown command: " + JSON.stringify(message.toJSON())
-      );
     });
   }
 }
