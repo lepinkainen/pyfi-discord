@@ -1,0 +1,37 @@
+version: "3"
+
+vars:
+  SERVER_USER: '{{.SERVER_USER | default "shrike"}}'
+  SERVER_HOST: '{{.SERVER_HOST | default "endymion.xyz"}}'
+  DEPLOY_PATH: '{{.DEPLOY_PATH | default "pyfi-discord/"}}'
+
+tasks:
+  build:
+    desc: Build the application
+    cmds:
+      - npm run build
+
+  deploy:files:
+    desc: Copy necessary files to server
+    cmds:
+      - rsync -avz --exclude 'node_modules' --exclude '.git' src/ dist/ package*.json deploy.sh .env tsconfig.json {{.SERVER_USER}}@{{.SERVER_HOST}}:{{.DEPLOY_PATH}}
+
+  deploy:install:
+    desc: Install dependencies on server
+    cmds:
+      - ssh {{.SERVER_USER}}@{{.SERVER_HOST}} "cd {{.DEPLOY_PATH}} && npm install --omit=dev"
+      - ssh {{.SERVER_USER}}@{{.SERVER_HOST}} "cd {{.DEPLOY_PATH}} && chmod +x deploy.sh"
+
+  deploy:restart:
+    desc: Restart the application
+    cmds:
+      - ssh {{.SERVER_USER}}@{{.SERVER_HOST}} "cd {{.DEPLOY_PATH}} && pm2 delete discord-bot || true"
+      - ssh {{.SERVER_USER}}@{{.SERVER_HOST}} "cd {{.DEPLOY_PATH}} && ./deploy.sh"
+
+  deploy:
+    desc: Deploy the application
+    deps: [build]
+    cmds:
+      - task: deploy:files
+      - task: deploy:install
+      - task: deploy:restart
