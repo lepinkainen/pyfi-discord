@@ -67,7 +67,13 @@ export class DiscordBot {
     const commands: ApplicationCommandDataResolvable[] = [
       new SlashCommandBuilder()
         .setName("weather")
-        .setDescription("Replies with Weather")
+        .setDescription("Get weather for a location")
+        .addStringOption((option) =>
+          option
+            .setName("location")
+            .setDescription("The city to get weather for")
+            .setRequired(true)
+        )
         .toJSON(),
       new SlashCommandBuilder()
         .setName("help")
@@ -115,9 +121,10 @@ export class DiscordBot {
 
   private registerCommandHandlers(): void {
     this.commands.set(
-      "ping",
+      "weather",
       async (interaction: ChatInputCommandInteraction) => {
-        await interaction.reply("Pong!");
+        await interaction.reply("Getting weather data...");
+        return;
       }
     );
 
@@ -151,6 +158,7 @@ export class DiscordBot {
     args: string
   ): Promise<boolean> {
     try {
+      await interaction.deferReply();
       console.debug(
         `External command '${command}' called with arguments: '${args}'`
       );
@@ -175,10 +183,60 @@ export class DiscordBot {
         const apiresult = res.data.result as string;
         if (apiresult.startsWith("Unknown command:")) return false;
 
-        if (res.data.result !== undefined && res.data.result !== "") {
+        if (command === "weather") {
+          const match = apiresult.match(
+            /(.+): Temperature: ([-\d.]+)°C, feels like: ([-\d.]+)°C, wind: ([\d.]+) m\/s, humidity: (\d+)%, pressure: (\d+)hPa, cloudiness: (\d+)%/
+          );
+
+          if (match) {
+            const [
+              _,
+              location,
+              temp,
+              feelsLike,
+              wind,
+              humidity,
+              pressure,
+              clouds,
+            ] = match;
+            const weatherEmbed = {
+              color: 0x0099ff,
+              title: `🌡️ Weather in ${location}`,
+              fields: [
+                {
+                  name: "Temperature",
+                  value: `${temp}°C\n(Feels like ${feelsLike}°C)`,
+                  inline: true,
+                },
+                {
+                  name: "Wind",
+                  value: `💨 ${wind} m/s`,
+                  inline: true,
+                },
+                {
+                  name: "Humidity",
+                  value: `💧 ${humidity}%`,
+                  inline: true,
+                },
+                {
+                  name: "Conditions",
+                  value: `☁️ ${clouds}% cloudy\n📊 ${pressure}hPa`,
+                  inline: true,
+                },
+              ],
+              timestamp: new Date().toISOString(),
+              footer: {
+                text: "Weather information",
+              },
+            };
+            await interaction.editReply({ embeds: [weatherEmbed] });
+          } else {
+            await interaction.editReply(
+              "Sorry, couldn't parse the weather data."
+            );
+          }
+        } else if (res.data.result !== undefined && res.data.result !== "") {
           await interaction.reply(res.data.result);
-        } else {
-          console.warn("Invalid command called on backend: ", command);
         }
         return true;
       }
@@ -187,10 +245,12 @@ export class DiscordBot {
       return false;
     } catch (error) {
       console.error(`Error executing command ${command}:`, error);
-      await interaction.reply({
-        content: "Sorry, there was an error processing your command.",
-        ephemeral: true,
-      });
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: "Sorry, there was an error processing your command.",
+          ephemeral: true,
+        });
+      }
       return true;
     }
   }
@@ -206,7 +266,7 @@ export class DiscordBot {
         await this.pyfiCommand(
           interaction,
           command,
-          interaction.options.getString("args") ?? ""
+          interaction.options.getString("location") ?? ""
         )
       ) {
         return;
