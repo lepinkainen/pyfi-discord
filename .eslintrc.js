@@ -11,7 +11,6 @@ const typeScriptRules = {
   // ... more rules
 };
 
-// Export the config
 export default {
   parser: "@typescript-eslint/parser",
   extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
