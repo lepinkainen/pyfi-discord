@@ -2,7 +2,7 @@ name: Dependabot Auto-merge
 
 on:
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 permissions:
   contents: write
@@ -16,10 +16,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Use Node.js 16.x
+      - name: Use Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 16.x
+          node-version: 22.x
 
       - name: Install dependencies
         run: yarn
