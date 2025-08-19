@@ -20,7 +20,7 @@
         "ts-loader": "^9.5.1",
         "typescript": "^5.9.2",
         "utf-8-validate": "^6.0.4",
-        "webpack": "^5.101.2",
+        "webpack": "^5.101.3",
         "yarn": "^1.22.22",
         "zlib-sync": "^0.1.10"
     },
@@ -36,8 +36,8 @@
     "devDependencies": {
         "@eslint/js": "^9.29.0",
         "@types/dotenv": "^8.2.0",
-        "@typescript-eslint/eslint-plugin": "^8.39.1",
-        "@typescript-eslint/parser": "^8.39.1",
+        "@typescript-eslint/eslint-plugin": "^8.40.0",
+        "@typescript-eslint/parser": "^8.40.0",
         "eslint-config-prettier": "^10.1.8",
         "globals": "^16.3.0",
         "prettier": "^3.6.2"
