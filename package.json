@@ -14,7 +14,7 @@
         "discord.js": "^14.22.1",
         "dotenv": "^16.6.0",
         "erlpack": "^0.1.4",
-        "eslint": "^9.34.0",
+        "eslint": "^9.35.0",
         "source-map-loader": "^5.0.0",
         "standard": "^17.1.0",
         "ts-loader": "^9.5.4",
