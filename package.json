@@ -9,7 +9,7 @@
     "dependencies": {
         "@types/node": "^22.0.0",
         "@types/ws": "^8.18.1",
-        "axios": "^1.12.2",
+        "axios": "^1.13.0",
         "bufferutil": "^4.0.8",
         "discord.js": "^14.24.0",
         "dotenv": "^16.6.0",
