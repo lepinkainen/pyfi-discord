@@ -743,10 +743,10 @@ available-typed-arrays@^1.0.7:
   dependencies:
     possible-typed-array-names "^1.0.0"
 
-axios@^1.13.0:
-  version "1.13.0"
-  resolved "https://registry.yarnpkg.com/axios/-/axios-1.13.0.tgz#ead6f495f41f9c8869dcf7b0f24f5a4ab89707f0"
-  integrity sha512-zt40Pz4zcRXra9CVV31KeyofwiNvAbJ5B6YPz9pMJ+yOSLikvPT4Yi5LjfgjRa9CawVYBaD1JQzIVcIvBejKeA==
+axios@^1.13.1:
+  version "1.13.1"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.13.1.tgz#45b62dc8fe04e0e92274e08b98e910ba3d7963a7"
+  integrity sha512-hU4EGxxt+j7TQijx1oYdAjw4xuIp1wRQSsbMFwSthCWeBQur1eF+qJ5iQ5sN3Tw8YRzQNKb8jszgBdMDVqwJcw==
   dependencies:
     follow-redirects "^1.15.6"
     form-data "^4.0.4"
@@ -982,10 +982,10 @@ discord-api-types@^0.38.1, discord-api-types@^0.38.16, discord-api-types@^0.38.3
   resolved "https://registry.yarnpkg.com/discord-api-types/-/discord-api-types-0.38.31.tgz#023c7f18662dc4a44a22798300f44e4b148cafb1"
   integrity sha512-kC94ANsk8ackj8ENTuO8joTNEL0KtymVhHy9dyEC/s4QAZ7GCx40dYEzQaadyo8w+oP0X8QydE/nzAWRylTGtQ==
 
-discord.js@^14.24.0:
-  version "14.24.0"
-  resolved "https://registry.yarnpkg.com/discord.js/-/discord.js-14.24.0.tgz#6751f1a24fb892f6799e17b9ebe2b3bc5e9ea350"
-  integrity sha512-KNq/ekT8bsmT3ZAfVre8cPbl+DfVYSdlLnDmGZPoz7Cw21LYeWHllRA9MivqNq5b1GPGAxGvyUN1vxbTb/PQWw==
+discord.js@^14.24.1:
+  version "14.24.1"
+  resolved "https://registry.yarnpkg.com/discord.js/-/discord.js-14.24.1.tgz#b2d088fbc1e43940a611ec9d5b38e6f864407ea3"
+  integrity sha512-LzL+MTGxB9mBwD8FjvkMwcIL4UtgG04e713U3+euqPCvOphhoVEoPpUNTvBPw4iJOas2uiuuh3JcveYSxIn8Tg==
   dependencies:
     "@discordjs/builders" "^1.13.0"
     "@discordjs/collection" "1.5.3"
