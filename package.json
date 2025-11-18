@@ -11,7 +11,7 @@
         "@types/ws": "^8.18.1",
         "axios": "^1.13.2",
         "bufferutil": "^4.0.8",
-        "discord.js": "^14.24.2",
+        "discord.js": "^14.25.0",
         "dotenv": "^16.6.0",
         "erlpack": "^0.1.4",
         "eslint": "^9.39.1",
@@ -36,8 +36,8 @@
     "devDependencies": {
         "@eslint/js": "^9.29.0",
         "@types/dotenv": "^8.2.0",
-        "@typescript-eslint/eslint-plugin": "^8.46.4",
-        "@typescript-eslint/parser": "^8.46.4",
+        "@typescript-eslint/eslint-plugin": "^8.47.0",
+        "@typescript-eslint/parser": "^8.47.0",
         "eslint-config-prettier": "^10.1.8",
         "globals": "^16.5.0",
         "prettier": "^3.6.2"
