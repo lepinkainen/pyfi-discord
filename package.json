@@ -39,7 +39,7 @@
         "@typescript-eslint/eslint-plugin": "^8.53.1",
         "@typescript-eslint/parser": "^8.53.1",
         "eslint-config-prettier": "^10.1.8",
-        "globals": "^16.5.0",
+        "globals": "^17.0.0",
         "prettier": "^3.8.1"
     }
 }
