@@ -18,16 +18,10 @@ export class DiscordBot {
     (interaction: ChatInputCommandInteraction) => Promise<void>
   > = new Collection();
 
+  private externalCommands: Set<string> = new Set(["weather"]);
+
   private client: Client = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent,
-      GatewayIntentBits.DirectMessages,
-      GatewayIntentBits.DirectMessageReactions,
-      GatewayIntentBits.DirectMessageTyping,
-      GatewayIntentBits.GuildMembers,
-    ],
+    intents: [GatewayIntentBits.Guilds],
   });
 
   private constructor() {
@@ -56,12 +50,13 @@ export class DiscordBot {
     this.validateEnvironment();
     await this.registerSlashCommands();
 
-    this.client
-      .login(process.env.DISCORD_KEY)
-      .then(() => console.log("Connected to Discord"))
-      .catch((error) =>
-        console.error(`Could not connect. Error: ${error.message}`)
-      );
+    try {
+      await this.client.login(process.env.DISCORD_KEY);
+      console.log("Connected to Discord");
+    } catch (error) {
+      console.error("Could not connect to Discord:", error);
+      throw error;
+    }
   }
 
   private async registerSlashCommands(): Promise<void> {
@@ -97,7 +92,6 @@ export class DiscordBot {
       const rest = new REST().setToken(process.env.DISCORD_KEY);
       console.log("Started refreshing guild (/) commands.");
 
-      // Register commands for a specific guild instead of globally
       await rest.put(
         Routes.applicationGuildCommands(
           process.env.CLIENT_ID,
@@ -113,8 +107,6 @@ export class DiscordBot {
   }
 
   private initializeClient(): void {
-    if (!this.client) return;
-
     this.registerCommandHandlers();
     this.setReadyHandler();
     this.setInteractionHandler();
@@ -124,24 +116,24 @@ export class DiscordBot {
     this.commands.set(
       "weather",
       async (interaction: ChatInputCommandInteraction) => {
-        await interaction.reply("Getting weather data...");
-        return;
+        const location = interaction.options.getString("location");
+        await interaction.reply(
+          location
+            ? `Weather backend is not configured right now for "${location}".`
+            : "Weather backend is not configured right now."
+        );
       }
     );
 
-    this.commands.set(
-      "help",
-      async (interaction: ChatInputCommandInteraction) => {
-        const helpMessage = [
-          "**Available Commands:**",
-          `/ping - Check if bot is responsive`,
-          `/help - Show this help message`,
-          // Add more command descriptions here
-        ].join("\n");
+    this.commands.set("help", async (interaction: ChatInputCommandInteraction) => {
+      const helpMessage = [
+        "**Available Commands:**",
+        "/weather <location> - Get weather for a location",
+        "/help - Show this help message",
+      ].join("\n");
 
-        await interaction.reply(helpMessage);
-      }
-    );
+      await interaction.reply(helpMessage);
+    });
   }
 
   private setReadyHandler(): void {
@@ -158,31 +150,40 @@ export class DiscordBot {
     command: string,
     args: string
   ): Promise<boolean> {
+    const lambdafunc = process.env.LAMBDA_URL;
+    const apiKey = process.env.LAMBDA_APIKEY;
+
+    if (!lambdafunc || !apiKey) {
+      console.info("Lambda not configured, falling back to internal commands");
+      return false;
+    }
+
     try {
       await interaction.deferReply();
       console.debug(
         `External command '${command}' called with arguments: '${args}'`
       );
 
-      const lambdafunc = process.env.LAMBDA_URL ?? "";
-      const headers = { "x-api-key": process.env.LAMBDA_APIKEY ?? "" };
-
       const res = await axios.post(
         lambdafunc,
         {
-          command: command,
-          args: args,
+          command,
+          args,
           user: interaction.user.username,
         },
         {
-          headers: headers,
+          headers: { "x-api-key": apiKey },
           timeout: 5000,
         }
       );
 
       if (res.status === 200 && res.data.errorType === undefined) {
         const apiresult = res.data.result as string;
-        if (apiresult.startsWith("Unknown command:")) return false;
+
+        if (apiresult.startsWith("Unknown command:")) {
+          await interaction.editReply("This command is not supported by Lambda.");
+          return true;
+        }
 
         if (command === "weather") {
           const match = apiresult.match(
@@ -232,18 +233,17 @@ export class DiscordBot {
             };
             await interaction.editReply({ embeds: [weatherEmbed] });
           } else {
-            await interaction.editReply(
-              "Sorry, couldn't parse the weather data."
-            );
+            await interaction.editReply("Sorry, couldn't parse the weather data.");
           }
         } else if (res.data.result !== undefined && res.data.result !== "") {
           await interaction.editReply(res.data.result);
         }
+
         return true;
       }
 
-      console.info("No external command matched, returning to main flow");
-      return false;
+      await interaction.editReply("No response from external command backend.");
+      return true;
     } catch (error) {
       console.error(`Error executing command ${command}:`, error);
       if (!interaction.replied && !interaction.deferred) {
@@ -251,8 +251,38 @@ export class DiscordBot {
           content: "Sorry, there was an error processing your command.",
           flags: MessageFlags.Ephemeral,
         });
+      } else {
+        await interaction.editReply("Sorry, there was an error processing your command.");
       }
       return true;
+    }
+  }
+
+  private async runInternalCommand(
+    interaction: ChatInputCommandInteraction,
+    command: string
+  ): Promise<void> {
+    const commandHandler = this.commands.get(command);
+    if (!commandHandler) {
+      await interaction.reply({
+        content: "Unknown command.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    try {
+      await commandHandler(interaction);
+    } catch (error) {
+      console.error(`Error executing command ${command}:`, error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: "An error occurred while executing the command.",
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.editReply("An error occurred while executing the command.");
+      }
     }
   }
 
@@ -262,30 +292,13 @@ export class DiscordBot {
 
       const command = interaction.commandName;
 
-      // Check external commands first
-      if (
-        await this.pyfiCommand(
-          interaction,
-          command,
-          interaction.options.getString("location") ?? ""
-        )
-      ) {
-        return;
+      if (this.externalCommands.has(command)) {
+        const args = interaction.options.getString("location") ?? "";
+        const handledExternally = await this.pyfiCommand(interaction, command, args);
+        if (handledExternally) return;
       }
 
-      // Check internal commands
-      const commandHandler = this.commands.get(command);
-      if (commandHandler) {
-        try {
-          await commandHandler(interaction);
-        } catch (error) {
-          console.error(`Error executing command ${command}:`, error);
-          await interaction.reply({
-            content: "An error occurred while executing the command.",
-            flags: MessageFlags.Ephemeral,
-          });
-        }
-      }
+      await this.runInternalCommand(interaction, command);
     });
   }
 }
