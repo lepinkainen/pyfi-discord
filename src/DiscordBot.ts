@@ -7,6 +7,7 @@ import {
   ChatInputCommandInteraction,
   Collection,
   ApplicationCommandDataResolvable,
+  MessageFlags,
 } from "discord.js";
 import axios from "axios";
 
@@ -236,7 +237,7 @@ export class DiscordBot {
             );
           }
         } else if (res.data.result !== undefined && res.data.result !== "") {
-          await interaction.reply(res.data.result);
+          await interaction.editReply(res.data.result);
         }
         return true;
       }
@@ -248,7 +249,7 @@ export class DiscordBot {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
           content: "Sorry, there was an error processing your command.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
       return true;
@@ -281,7 +282,7 @@ export class DiscordBot {
           console.error(`Error executing command ${command}:`, error);
           await interaction.reply({
             content: "An error occurred while executing the command.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
       }
