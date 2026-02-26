@@ -24,7 +24,7 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^25.3.0",
+    "@types/node": "^25.3.1",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
@@ -36,7 +36,7 @@
     "standard": "^17.1.2",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
-    "webpack": "^5.105.2",
+    "webpack": "^5.105.3",
     "yarn": "^1.22.22"
   }
 }
