@@ -9,7 +9,7 @@ tasks:
   build:
     desc: Build the application
     cmds:
-      - npm run build
+      - pnpm build
 
   deploy:files:
     desc: Copy necessary files to server
@@ -19,7 +19,7 @@ tasks:
   deploy:install:
     desc: Install dependencies on server
     cmds:
-      - ssh {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}} "cd {{.DEPLOY_PATH}} && npm install --omit=dev"
+      - ssh {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}} "cd {{.DEPLOY_PATH}} && pnpm install --prod"
       - ssh {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}} "cd {{.DEPLOY_PATH}} && chmod +x deploy.sh"
 
   deploy:restart:
