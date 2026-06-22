@@ -43,7 +43,7 @@
     "source-map-loader": "^5.0.0",
     "standard": "^17.1.2",
     "ts-loader": "^9.6.1",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "webpack": "^5.107.2"
   }
 }
