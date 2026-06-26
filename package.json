@@ -8,7 +8,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "axios": "^1.18.0",
+    "axios": "^1.18.1",
     "bufferutil": "^4.1.0",
     "discord.js": "^14.26.4",
     "dotenv": "^17.4.2",
@@ -23,27 +23,20 @@
   },
   "author": "",
   "license": "MIT",
-  "pnpm": {
-    "overrides": {
-      "undici": "^6.24.1",
-      "flatted": "^3.4.2"
-    },
-    "onlyBuiltDependencies": ["bufferutil", "utf-8-validate"]
-  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^25.5.0",
+    "@types/node": "^26.0.1",
     "@types/ws": "^8.18.1",
-    "@typescript-eslint/eslint-plugin": "^8.61.1",
-    "@typescript-eslint/parser": "^8.61.1",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
     "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.6.0",
-    "prettier": "^3.8.4",
+    "globals": "^17.7.0",
+    "prettier": "^3.8.5",
     "source-map-loader": "^5.0.0",
     "standard": "^17.1.2",
-    "ts-loader": "^9.6.1",
-    "typescript": "^5.9.3",
-    "webpack": "^5.107.2"
+    "ts-loader": "^9.6.2",
+    "typescript": "^6.0.3",
+    "webpack": "^5.108.1"
   }
 }
