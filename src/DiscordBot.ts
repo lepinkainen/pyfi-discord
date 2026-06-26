@@ -608,6 +608,18 @@ export class DiscordBot {
           "Otherwise reply ONLY with the message to post — no preamble, no quotes, no meta-commentary, under 1500 characters.",
         ].join(" ");
 
+    // Show "Bot is typing..." while the agentic loop runs. The indicator expires
+    // after ~10s, so refresh it on an interval until we finish. Only for directed
+    // mentions — those always answer; an unprompted reply may PASS, and typing
+    // then going silent (ghost-typing) looks broken.
+    let typing: NodeJS.Timeout | undefined;
+    if (directed && "sendTyping" in message.channel) {
+      const channel = message.channel;
+      const ping = () => channel.sendTyping().catch(() => undefined);
+      ping();
+      typing = setInterval(ping, 8000);
+    }
+
     const tools = this.buildProactiveTools();
     const messages: Anthropic.MessageParam[] = [
       {
@@ -619,6 +631,7 @@ export class DiscordBot {
     const MAX_ITERS = 5;
     let response: Anthropic.Message | undefined;
 
+    try {
     for (let i = 0; i < MAX_ITERS; i++) {
       try {
         response = await this.getAnthropic().messages.create({
@@ -681,12 +694,22 @@ export class DiscordBot {
     }
 
     // PASS only applies to unprompted proactive replies; a direct mention always answers.
-    if (!directed && text.startsWith(DiscordBot.PROACTIVE_PASS)) {
+    if (!directed && text.includes(DiscordBot.PROACTIVE_PASS)) {
       this.proactiveDebug(`Claude verdict: PASS (raw="${text.slice(0, 60)}")`);
       return;
     }
 
-    this.proactiveDebug(`Claude verdict: REPLY (${text.length} chars)`);
-    await message.reply(text.slice(0, 2000));
+    // Strip a stray sentinel a directed reply may have appended.
+    const reply = text.split(DiscordBot.PROACTIVE_PASS).join("").trim();
+    if (!reply) {
+      this.proactiveDebug("Claude verdict: empty after sentinel strip; silent");
+      return;
+    }
+
+    this.proactiveDebug(`Claude verdict: REPLY (${reply.length} chars)`);
+    await message.reply(reply.slice(0, 2000));
+    } finally {
+      if (typing) clearInterval(typing);
+    }
   }
 }
