@@ -1,0 +1,7 @@
+overrides:
+  undici: ^6.24.1
+  flatted: ^3.4.2
+
+onlyBuiltDependencies:
+  - bufferutil
+  - utf-8-validate

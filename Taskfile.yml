@@ -14,18 +14,16 @@ tasks:
   deploy:files:
     desc: Copy necessary files to server
     cmds:
-      - rsync -avz --exclude 'node_modules' --exclude '.git' src/ dist/ package*.json deploy.sh .env tsconfig.json {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}}:{{.DEPLOY_PATH}}
+      - rsync -avz --delete --exclude 'node_modules' --exclude '.git' dist package.json pnpm-lock.yaml pnpm-workspace.yaml deploy.sh ecosystem.config.js .env {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}}:{{.DEPLOY_PATH}}
 
   deploy:install:
-    desc: Install dependencies on server
+    desc: Install production dependencies on server
     cmds:
-      - ssh {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}} "cd {{.DEPLOY_PATH}} && pnpm install --prod"
-      - ssh {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}} "cd {{.DEPLOY_PATH}} && chmod +x deploy.sh"
+      - ssh {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}} "cd {{.DEPLOY_PATH}} && pnpm install --prod --frozen-lockfile && chmod +x deploy.sh"
 
   deploy:restart:
-    desc: Restart the application
+    desc: Reload the application (zero-downtime)
     cmds:
-      - ssh {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}} "cd {{.DEPLOY_PATH}} && pm2 delete discord-bot || true"
       - ssh {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}} "cd {{.DEPLOY_PATH}} && ./deploy.sh"
 
   deploy:

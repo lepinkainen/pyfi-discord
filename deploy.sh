@@ -1,3 +1,3 @@
 #!/bin/bash
-npm run build
-pm2 start dist/app.js --name discord-bot
+set -euo pipefail
+pm2 startOrReload ecosystem.config.js
