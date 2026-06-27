@@ -150,7 +150,7 @@ export class DiscordBot {
   }
 
   private setReadyHandler(): void {
-    this.client.on("ready", () => {
+    this.client.on("clientReady", () => {
       console.log(`Logged in as ${this.client.user?.tag}!`);
     });
   }
