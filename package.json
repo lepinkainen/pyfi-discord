@@ -5,14 +5,16 @@
   "main": "dist/app.js",
   "packageManager": "pnpm@10.32.1",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.5.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
+    "@xenova/transformers": "^2.17.2",
     "axios": "^1.18.1",
     "bufferutil": "^4.1.0",
     "discord.js": "^14.26.4",
     "dotenv": "^17.4.2",
+    "sqlite-vec": "^0.1.9",
     "utf-8-validate": "^6.0.6"
   },
   "scripts": {
@@ -20,6 +22,8 @@
     "test": "We don't do testing here",
     "start": "node dist/app.js",
     "dev": "pnpm build && pnpm start",
+    "ingest": "tsx scripts/ingest.ts",
+    "cli": "tsx scripts/cli.ts",
     "lint": "pnpm eslint src/"
   },
   "author": "",
@@ -33,10 +37,12 @@
     "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
+    "pdfjs-dist": "^6.0.227",
     "prettier": "^3.8.5",
     "source-map-loader": "^5.0.0",
     "standard": "^17.1.2",
     "ts-loader": "^9.6.2",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "webpack": "^5.108.1"
   }

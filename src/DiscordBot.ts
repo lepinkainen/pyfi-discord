@@ -12,6 +12,9 @@ import {
 } from "discord.js";
 import axios from "axios";
 import Anthropic from "@anthropic-ai/sdk";
+import { datasetForChannel } from "./rag/datasets";
+import { datasetReady, search } from "./rag/store";
+import { embedQuery } from "./rag/embeddings";
 
 export class DiscordBot {
   private static instance: DiscordBot;
@@ -455,11 +458,35 @@ export class DiscordBot {
    * Builds the tool set offered to Claude for proactive replies. Each tool is
    * only included when its backing capability is available/enabled.
    */
-  private buildProactiveTools(): Anthropic.MessageCreateParams["tools"] {
+  private buildProactiveTools(
+    dataset?: string
+  ): Anthropic.MessageCreateParams["tools"] {
     const tools: NonNullable<Anthropic.MessageCreateParams["tools"]> = [];
 
     if (process.env.PROACTIVE_WEB_SEARCH) {
       tools.push({ type: "web_search_20260209", name: "web_search" });
+    }
+
+    // Knowledge base for this channel's linked dataset (e.g. a TTRPG rulebook).
+    if (dataset) {
+      tools.push({
+        name: "search_rules",
+        description:
+          `Search the ${dataset} rulebook/knowledge base for relevant passages. ` +
+          "Use this for any rules, lore, or how-to question about this game. " +
+          "Returns matching excerpts, each tagged with its source page like [p.27]. " +
+          "Cite the page number(s) in your answer.",
+        input_schema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "What to look up, e.g. 'how to create a character'.",
+            },
+          },
+          required: ["query"],
+        },
+      });
     }
 
     if (process.env.LAMBDA_URL && process.env.LAMBDA_APIKEY) {
@@ -519,9 +546,23 @@ export class DiscordBot {
   private async runProactiveTool(
     message: Message,
     name: string,
-    input: Record<string, unknown>
+    input: Record<string, unknown>,
+    dataset?: string
   ): Promise<string> {
     try {
+      if (name === "search_rules") {
+        if (!dataset) return "No knowledge base is linked to this channel.";
+        const query = String(input.query ?? "").trim();
+        if (!query) return "Provide a query to search for.";
+        const vec = await embedQuery(query);
+        const hits = search(dataset, vec, 5);
+        if (hits.length === 0) return `No matching passages in the ${dataset} knowledge base.`;
+        return hits
+          .map((h) => `[p.${h.page}] ${h.text}`)
+          .join("\n\n---\n\n")
+          .slice(0, 4000);
+      }
+
       if (name === "pyfibot") {
         const result = await this.callLambda(
           String(input.command ?? ""),
@@ -592,13 +633,21 @@ export class DiscordBot {
       .join("\n");
 
     const model = process.env.PROACTIVE_MODEL ?? "claude-sonnet-4-6";
+
+    // Knowledge base linked to this channel, if any (and actually indexed).
+    const linked = datasetForChannel(message.channelId);
+    const dataset = linked && datasetReady(linked) ? linked : undefined;
+    const kbHint = dataset
+      ? ` This channel is about the "${dataset}" game; use the search_rules tool to answer rules/lore questions and cite page numbers (e.g. "(p.27)").`
+      : "";
+
     const system = directed
       ? [
           "You are a Discord chat bot. A user has directly @mentioned you and is asking you something.",
           "Always answer their request helpfully and directly — do not stay silent.",
           "Use the available tools to look things up when they help.",
           "Reply ONLY with the message to post — no preamble, no quotes, no meta-commentary, under 1500 characters.",
-        ].join(" ")
+        ].join(" ") + kbHint
       : [
           "You are a Discord chat bot that occasionally chimes in on a channel's conversation.",
           "Only respond when you can genuinely add value: a useful fact, a correction, a helpful answer, or a well-placed bit of wit.",
@@ -606,7 +655,7 @@ export class DiscordBot {
           "You may use the available tools to look things up before deciding.",
           `If you should NOT respond, reply with exactly ${DiscordBot.PROACTIVE_PASS} and nothing else.`,
           "Otherwise reply ONLY with the message to post — no preamble, no quotes, no meta-commentary, under 1500 characters.",
-        ].join(" ");
+        ].join(" ") + kbHint;
 
     // Show "Bot is typing..." while the agentic loop runs. The indicator expires
     // after ~10s, so refresh it on an interval until we finish. Only for directed
@@ -620,7 +669,7 @@ export class DiscordBot {
       typing = setInterval(ping, 8000);
     }
 
-    const tools = this.buildProactiveTools();
+    const tools = this.buildProactiveTools(dataset);
     const messages: Anthropic.MessageParam[] = [
       {
         role: "user",
@@ -670,7 +719,8 @@ export class DiscordBot {
           const out = await this.runProactiveTool(
             message,
             tu.name,
-            tu.input as Record<string, unknown>
+            tu.input as Record<string, unknown>,
+            dataset
           );
           this.proactiveDebug(`tool result (${tu.name}): ${out.slice(0, 120)}`);
           results.push({ type: "tool_result", tool_use_id: tu.id, content: out });

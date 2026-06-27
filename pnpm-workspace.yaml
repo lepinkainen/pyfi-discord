@@ -5,3 +5,7 @@ overrides:
 onlyBuiltDependencies:
   - bufferutil
   - utf-8-validate
+  # RAG: local embeddings (transformers.js) need these prebuilt native binaries.
+  - sharp
+  - onnxruntime-node
+  - esbuild

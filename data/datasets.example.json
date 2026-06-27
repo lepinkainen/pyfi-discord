@@ -1,0 +1,5 @@
+{
+  "my-dataset": {
+    "channels": ["PUT_DISCORD_CHANNEL_ID_HERE"]
+  }
+}

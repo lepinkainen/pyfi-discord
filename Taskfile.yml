@@ -14,7 +14,7 @@ tasks:
   deploy:files:
     desc: Copy necessary files to server
     cmds:
-      - rsync -avz --delete --exclude 'node_modules' --exclude '.git' dist package.json pnpm-lock.yaml pnpm-workspace.yaml deploy.sh ecosystem.config.js .env {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}}:{{.DEPLOY_PATH}}
+      - rsync -avz --delete --exclude 'node_modules' --exclude '.git' --exclude '*.pdf' dist data package.json pnpm-lock.yaml pnpm-workspace.yaml deploy.sh ecosystem.config.js .env {{.DEPLOY_SERVER_USER}}@{{.DEPLOY_SERVER_HOST}}:{{.DEPLOY_PATH}}
 
   deploy:install:
     desc: Install production dependencies on server

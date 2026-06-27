@@ -12,6 +12,7 @@ Discord bot bridging Discord slash commands to pyfibot AWS Lambda functions. Typ
 - `pnpm dev` - Build then run
 - `pnpm start` - Run compiled `dist/app.js`
 - `pnpm lint` - ESLint over `src/`
+- `pnpm ingest <dataset> [--pdf <file>]` - Build the RAG index for a knowledge base (see below). Runs via `tsx`, not compiled into `dist/`.
 - `task build` / `task deploy` - Taskfile equivalents (deploy = full pipeline)
 
 There is no test suite (`pnpm test` is a no-op stub).
@@ -49,7 +50,19 @@ Beyond slash commands, `setMessageHandler()` listens to `messageCreate` and lets
 
 **Direct @mention:** `isDirectMention()` detects when the bot user is tagged. A direct mention bypasses *all* limiters (whitelist, min length, prefix, cooldown — only `ANTHROPIC_API_KEY` and the bot-author guard still apply) and forces an answer: `generateProactiveReply(message, directed=true)` uses a "you were directly addressed, always answer" system prompt and skips the `[[PASS]]` silence path. So `@pyfibot what's the weather in helsinki` works in any channel the bot can see, even without `PROACTIVE_CHANNELS` configured.
 
-**Tool calling (proactive only):** `generateProactiveReply()` is a manual agentic loop (max 5 iterations). `buildProactiveTools()` offers Claude: `web_search` (Anthropic server-side, only when `PROACTIVE_WEB_SEARCH` is set), `pyfibot` (custom tool → `callLambda()`, only when `LAMBDA_URL`/`LAMBDA_APIKEY` are set), and always `fetch_history` + `lookup_user` (Discord context). The loop handles `pause_turn` (server tool ran → re-send) and `tool_use` (run custom tool via `runProactiveTool()` → feed `tool_result` back). `callLambda()` shares the POST shape with `pyfiCommand()` but is decoupled from any interaction; `pyfiCommand()` itself is unchanged.
+**Tool calling (proactive only):** `generateProactiveReply()` is a manual agentic loop (max 5 iterations). `buildProactiveTools(dataset?)` offers Claude: `web_search` (Anthropic server-side, only when `PROACTIVE_WEB_SEARCH` is set), `pyfibot` (custom tool → `callLambda()`, only when `LAMBDA_URL`/`LAMBDA_APIKEY` are set), `search_rules` (knowledge-base retrieval — only when the channel is linked to an indexed dataset; see below), and always `fetch_history` + `lookup_user` (Discord context). The loop handles `pause_turn` (server tool ran → re-send) and `tool_use` (run custom tool via `runProactiveTool()` → feed `tool_result` back). `callLambda()` shares the POST shape with `pyfiCommand()` but is decoupled from any interaction; `pyfiCommand()` itself is unchanged.
+
+### Knowledge bases (RAG)
+
+Per-channel retrieval over local document sets ("datasets"), e.g. a TTRPG rulebook linked to its channel. Fully local: embeddings run on-host via transformers.js (`bge-small-en-v1.5`, 384-dim) — no embedding API key. Aligns with the project's local-LLM endgame.
+
+- **Storage** (`src/rag/store.ts`): one `data/rag.db` file via **`node:sqlite`** (built-in, no native build; needs Node ≥22.5) + the **sqlite-vec** loadable extension (prebuilt per-platform binary, fetched by npm — no compile). One `vec0` virtual table; `dataset` is a **partition key** so each channel only searches its own game. Cosine distance.
+- **Embeddings** (`src/rag/embeddings.ts`): `@xenova/transformers` v2 (CommonJS — v3 is ESM-only). Asymmetric bge: passages raw, queries get an instruction prefix; outputs normalized so dot product = cosine. Model cached under `data/.models/` (downloaded on first ingest/run).
+- **Datasets ↔ channels** (`src/rag/datasets.ts` + `data/datasets.json`): `{ "pirate-borg": { "channels": ["<id>", ...] } }`. `datasetForChannel()` reverse-maps a message's channel to a dataset. A dataset's source PDFs live in `data/<dataset>/` (gitignored — copyrighted). `datasets.json` itself is gitignored (holds env-specific channel IDs); copy `data/datasets.example.json` to start. **Channel IDs must be quoted strings** — Discord snowflakes exceed JS safe-integer range, so an unquoted number is silently corrupted by `JSON.parse` and never matches the string `channelId` from discord.js.
+- **Ingest** (`scripts/ingest.ts`, `pnpm ingest <dataset>`): extracts PDF text **per page** (pdfjs-dist, ingest-only — runtime never imports it), chunks with overlap **keeping the page number**, embeds locally, and writes under the dataset partition (replacing prior rows). Page numbers flow through so answers can cite "(p.27)".
+- **Wiring**: `generateProactiveReply()` resolves `dataset = datasetForChannel(channelId)` (only if `datasetReady()`), passes it to `buildProactiveTools()` and `runProactiveTool()`, and appends a "cite page numbers" hint to the system prompt. `search_rules` → `embedQuery()` → `search()` returns top-5 chunks tagged `[p.N]`.
+
+Native binaries (`sharp`, `onnxruntime-node`, `esbuild`) are listed in `pnpm-workspace.yaml` `onlyBuiltDependencies` so the server install builds/fetches them. `task deploy` rsyncs `data/` (config, `rag.db`, model cache) but excludes `*.pdf`. **No env vars required** — the feature activates purely from `datasets.json` + an indexed dataset. Optional overrides: `RAG_DB_PATH`, `RAG_DATASETS_PATH`.
 
 ### Build
 

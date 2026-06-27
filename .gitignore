@@ -114,3 +114,12 @@ dist
 .vscode-test
 
 # End of https://www.toptal.com/developers/gitignore/api/node
+# RAG knowledge-base artifacts
+# Source PDFs are copyrighted — keep out of git.
+data/**/*.pdf
+# Built vector store + local model cache (rebuilt via `pnpm ingest`).
+data/rag.db
+data/rag.db-*
+data/.models/
+# Channel IDs are environment-specific — keep the live map out of git.
+data/datasets.json
