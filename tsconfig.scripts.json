@@ -1,0 +1,13 @@
+{
+  /* Type-checks the tsx-run scripts/ (and the src/ they import) without emitting.
+     scripts/ are excluded from the main build's tsconfig (rootDir: ./src), so
+     they would otherwise rot — only caught at runtime. `pnpm typecheck` runs this. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "module": "nodenext",
+    "moduleResolution": "nodenext"
+  },
+  "include": ["./src/**/*", "./scripts/**/*"]
+}

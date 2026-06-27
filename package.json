@@ -24,7 +24,8 @@
     "dev": "pnpm build && pnpm start",
     "ingest": "tsx scripts/ingest.ts",
     "cli": "tsx scripts/cli.ts",
-    "lint": "pnpm eslint src/"
+    "typecheck": "tsc --noEmit -p tsconfig.scripts.json",
+    "lint": "pnpm eslint src/ scripts/"
   },
   "author": "",
   "license": "MIT",
