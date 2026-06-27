@@ -15,7 +15,7 @@ import "dotenv/config";
 import * as readline from "readline";
 import Anthropic from "@anthropic-ai/sdk";
 import { embedQuery } from "../src/rag/embeddings";
-import { datasetReady, search } from "../src/rag/store";
+import { datasetReady, listDatasets, search } from "../src/rag/store";
 
 const MAX_ITERS = 5;
 const TOP_K = 5;
@@ -93,10 +93,48 @@ async function answer(
   return "(gave up after too many tool calls)";
 }
 
+/** Minimal arrow-key single-select, rendered to stderr (stdout stays clean). */
+function selectDataset(options: string[]): Promise<string> {
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+    let idx = 0;
+    readline.emitKeypressEvents(stdin);
+    stdin.setRawMode(true);
+    stdin.resume();
+
+    const render = (first = false): void => {
+      if (!first) process.stderr.write(`\x1b[${options.length + 1}A`); // back to header
+      process.stderr.write("Select dataset (↑/↓, Enter):\x1b[K\n");
+      options.forEach((o, i) => {
+        const sel = i === idx;
+        process.stderr.write(`${sel ? "\x1b[36m❯ " : "  "}${o}${sel ? "\x1b[0m" : ""}\x1b[K\n`);
+      });
+    };
+
+    const cleanup = (): void => {
+      stdin.setRawMode(false);
+      stdin.removeListener("keypress", onKey);
+      stdin.pause();
+      process.stderr.write("\n");
+    };
+
+    const onKey = (_: string, key: readline.Key): void => {
+      if (!key) return;
+      if (key.name === "up") (idx = (idx - 1 + options.length) % options.length), render();
+      else if (key.name === "down") (idx = (idx + 1) % options.length), render();
+      else if (key.name === "return") cleanup(), resolve(options[idx]);
+      else if (key.name === "c" && key.ctrl) (cleanup(), process.exit(130));
+    };
+
+    render(true);
+    stdin.on("keypress", onKey);
+  });
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
 
-  let dataset = "pirate-borg";
+  let dataset: string | undefined;
   let retrievalOnly = false;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
@@ -105,6 +143,22 @@ async function main(): Promise<void> {
     else rest.push(argv[i]);
   }
   const oneShot = rest.join(" ").trim();
+
+  // Resolve which dataset to use: explicit flag > single indexed > interactive pick.
+  if (!dataset) {
+    const available = listDatasets();
+    if (available.length === 0) {
+      err("No datasets indexed. Run: pnpm ingest <dataset>");
+      process.exit(1);
+    } else if (available.length === 1) {
+      dataset = available[0];
+    } else if (process.stdin.isTTY) {
+      dataset = await selectDataset(available);
+    } else {
+      err(`Multiple datasets — pass --dataset <name>: ${available.join(", ")}`);
+      process.exit(1);
+    }
+  }
 
   if (!datasetReady(dataset)) {
     err(`Dataset "${dataset}" is not indexed. Run: pnpm ingest ${dataset}`);

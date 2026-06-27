@@ -54,6 +54,19 @@ function getReadDb(): DatabaseSync {
   return readDb;
 }
 
+/** Distinct dataset names that currently have indexed rows. */
+export function listDatasets(): string[] {
+  try {
+    const db = getReadDb();
+    const rows = db
+      .prepare("SELECT DISTINCT dataset FROM vec_chunks ORDER BY dataset")
+      .all() as Array<{ dataset: string }>;
+    return rows.map((r) => r.dataset);
+  } catch {
+    return [];
+  }
+}
+
 /** Returns true if the DB file exists and holds rows for the given dataset. */
 export function datasetReady(dataset: string): boolean {
   try {
