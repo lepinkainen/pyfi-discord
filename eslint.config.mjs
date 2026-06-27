@@ -28,6 +28,7 @@ export default [
         },
       ],
       "no-unused-vars": "off", // Turn off base rule in favor of TypeScript version
+      "no-undef": "off", // TypeScript's own checker handles undefined variables in .ts files
     },
   },
   {
