@@ -16,12 +16,14 @@ export const DB_PATH =
 
 export interface ChunkRow {
   page: number;
+  source: string; // origin document (e.g. PDF basename) for unambiguous citation
   text: string;
   embedding: number[];
 }
 
 export interface SearchHit {
   page: number;
+  source: string;
   text: string;
   score: number; // cosine similarity in [0,1]; higher is closer
 }
@@ -38,6 +40,7 @@ function ensureSchema(db: DatabaseSync): void {
       embedding float[${EMBED_DIM}] distance_metric=cosine,
       dataset TEXT partition key,
       page INTEGER,
+      +source TEXT,
       +text TEXT
     );
   `);
@@ -89,18 +92,24 @@ export function search(
   const db = getReadDb();
   const rows = db
     .prepare(
-      `SELECT page, text, distance
+      `SELECT page, source, text, distance
          FROM vec_chunks
         WHERE embedding MATCH ? AND k = ? AND dataset = ?
         ORDER BY distance`
     )
     .all(JSON.stringify(queryEmbedding), k, dataset) as Array<{
     page: number;
+    source: string;
     text: string;
     distance: number;
   }>;
   // cosine distance -> similarity
-  return rows.map((r) => ({ page: r.page, text: r.text, score: 1 - r.distance }));
+  return rows.map((r) => ({
+    page: r.page,
+    source: r.source,
+    text: r.text,
+    score: 1 - r.distance,
+  }));
 }
 
 // ---- Ingest (write) -------------------------------------------------------
@@ -113,12 +122,18 @@ export function replaceDataset(dataset: string, rows: ChunkRow[]): void {
     db.exec("BEGIN");
     db.prepare("DELETE FROM vec_chunks WHERE dataset = ?").run(dataset);
     const ins = db.prepare(
-      "INSERT INTO vec_chunks(embedding, dataset, page, text) VALUES (?, ?, ?, ?)"
+      "INSERT INTO vec_chunks(embedding, dataset, page, source, text) VALUES (?, ?, ?, ?, ?)"
     );
     for (const r of rows) {
       // sqlite-vec's INTEGER metadata column is strict; node:sqlite binds plain
       // JS numbers as REAL, so coerce the page to a BigInt (-> INTEGER).
-      ins.run(JSON.stringify(r.embedding), dataset, BigInt(Math.trunc(r.page)), r.text);
+      ins.run(
+        JSON.stringify(r.embedding),
+        dataset,
+        BigInt(Math.trunc(r.page)),
+        r.source,
+        r.text
+      );
     }
     db.exec("COMMIT");
   } finally {

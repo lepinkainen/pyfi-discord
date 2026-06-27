@@ -135,7 +135,7 @@ function cleanLine(text: string): string {
 
 async function extractPages(pdfPath: string): Promise<PageText[]> {
   const data = new Uint8Array(fs.readFileSync(pdfPath));
-  const doc = await getDocument({ data, isEvalSupported: false }).promise;
+  const doc = await getDocument({ data }).promise;
   const pages: PageText[] = [];
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
@@ -241,13 +241,16 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // 1. Extract + chunk, keeping page numbers.
-  const chunks: { page: number; text: string }[] = [];
+  // 1. Extract + chunk, keeping page numbers and source document. The source is
+  // the PDF filename minus extension, so a multi-book dataset can cite
+  // "(Core Rulebook, p.27)" instead of an ambiguous bare page number.
+  const chunks: { page: number; source: string; text: string }[] = [];
   for (const pdfPath of pdfPaths) {
+    const source = path.basename(pdfPath, path.extname(pdfPath));
     console.log(`Extracting ${path.basename(pdfPath)} ...`);
     const pages = await extractPages(pdfPath);
     for (const { page, text } of pages) {
-      for (const piece of chunkPage(text)) chunks.push({ page, text: piece });
+      for (const piece of chunkPage(text)) chunks.push({ page, source, text: piece });
     }
   }
   console.log(`Got ${chunks.length} chunks. Embedding (local model) ...`);
@@ -257,7 +260,9 @@ async function main(): Promise<void> {
   for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
     const batch = chunks.slice(i, i + EMBED_BATCH);
     const vecs = await embedPassages(batch.map((c) => c.text));
-    batch.forEach((c, j) => rows.push({ page: c.page, text: c.text, embedding: vecs[j] }));
+    batch.forEach((c, j) =>
+      rows.push({ page: c.page, source: c.source, text: c.text, embedding: vecs[j] })
+    );
     process.stdout.write(`\r  embedded ${Math.min(i + EMBED_BATCH, chunks.length)}/${chunks.length}`);
   }
   process.stdout.write("\n");

@@ -29,7 +29,9 @@ async function retrieve(dataset: string, query: string): Promise<string> {
   const vec = await embedQuery(query);
   const hits = search(dataset, vec, TOP_K);
   if (hits.length === 0) return `No matching passages in the ${dataset} knowledge base.`;
-  return hits.map((h) => `[p.${h.page}] ${h.text}`).join("\n\n---\n\n");
+  return hits
+    .map((h) => `[${h.source} p.${h.page} score=${h.score.toFixed(2)}] ${h.text}`)
+    .join("\n\n---\n\n");
 }
 
 const TOOL: Anthropic.Tool = {
@@ -54,8 +56,9 @@ async function answer(
   const model = process.env.PROACTIVE_MODEL ?? "claude-sonnet-4-6";
   const system =
     `You answer questions about the "${dataset}" tabletop RPG using its rulebook. ` +
-    "Use the search_rules tool to look things up, then answer concisely and cite " +
-    'page numbers like "(p.27)". If the rules don\'t cover it, say so.';
+    "You MUST call search_rules and base your answer solely on what it returns — " +
+    "never on prior knowledge. Cite the source and page for every claim, like " +
+    '"(Core Rulebook, p.27)". If the rules don\'t cover it, say so.';
 
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: question },
@@ -186,7 +189,10 @@ async function main(): Promise<void> {
   // Interactive REPL.
   err(`RAG chat — dataset "${dataset}"${retrievalOnly ? " (retrieval-only)" : ""}. Ctrl-D or "exit" to quit.`);
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
-  const prompt = (): void => rl.setPrompt("\n> ") || rl.prompt();
+  const prompt = (): void => {
+    rl.setPrompt("\n> ");
+    rl.prompt();
+  };
   prompt();
 
   for await (const line of rl) {
