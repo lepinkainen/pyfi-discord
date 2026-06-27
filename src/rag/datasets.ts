@@ -27,17 +27,33 @@ export function loadDatasets(): Record<string, DatasetConfig> {
       string,
       DatasetConfig
     >;
-  } catch {
+  } catch (err) {
+    // ENOENT (no config) is the normal "feature off" case; anything else
+    // (malformed JSON, bad permissions) is a misconfiguration worth surfacing
+    // rather than silently behaving like there's no config at all.
+    const e = err as NodeJS.ErrnoException;
+    if (e.code !== "ENOENT") {
+      console.error(`Failed to load datasets config at ${CONFIG_PATH}:`, e.message);
+    }
     cache = {};
   }
   return cache;
 }
 
-/** The dataset linked to a channel, or undefined if none. First match wins. */
-export function datasetForChannel(channelId: string): string | undefined {
+/**
+ * The dataset linked to a channel, or undefined if none. First match wins.
+ * Pass `parentId` (a thread's parent channel) to fall back to it — messages in
+ * a Discord thread carry the thread's own id, but datasets are mapped to the
+ * parent channel, so a thread would otherwise never match.
+ */
+export function datasetForChannel(
+  channelId: string,
+  parentId?: string | null
+): string | undefined {
   const datasets = loadDatasets();
   for (const [name, cfg] of Object.entries(datasets)) {
     if (cfg.channels?.includes(channelId)) return name;
+    if (parentId && cfg.channels?.includes(parentId)) return name;
   }
   return undefined;
 }
