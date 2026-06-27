@@ -555,10 +555,12 @@ export class DiscordBot {
         const query = String(input.query ?? "").trim();
         if (!query) return "Provide a query to search for.";
         const vec = await embedQuery(query);
-        const hits = search(dataset, vec, 5);
+        const hits = search(dataset, vec, 8);
         if (hits.length === 0) return `No matching passages in the ${dataset} knowledge base.`;
+        // Tag each hit with its similarity score so Claude can judge result
+        // quality and stop re-searching when the top hits are the best available.
         return hits
-          .map((h) => `[p.${h.page}] ${h.text}`)
+          .map((h) => `[p.${h.page} score=${h.score.toFixed(2)}] ${h.text}`)
           .join("\n\n---\n\n")
           .slice(0, 4000);
       }
@@ -677,7 +679,7 @@ export class DiscordBot {
       },
     ];
 
-    const MAX_ITERS = 5;
+    const MAX_ITERS = 8;
     let response: Anthropic.Message | undefined;
 
     try {
@@ -730,6 +732,26 @@ export class DiscordBot {
       }
 
       break; // end_turn / refusal / max_tokens
+    }
+
+    // Loop ran out of iterations while Claude still wanted to call a tool. The
+    // last response holds only tool_use blocks (no prose), so without this we'd
+    // post nothing — looking like the bot "gave up". Force one final turn with
+    // tools disabled so it must answer from what it has already gathered.
+    if (response?.stop_reason === "tool_use") {
+      this.proactiveDebug("hit MAX_ITERS mid-search; forcing a tool-free final answer");
+      try {
+        response = await this.getAnthropic().messages.create({
+          model,
+          max_tokens: 2048,
+          system,
+          tool_choice: { type: "none" },
+          tools,
+          messages,
+        });
+      } catch (error) {
+        console.error("Anthropic forced-final request failed:", error);
+      }
     }
 
     const text = (response?.content ?? [])
