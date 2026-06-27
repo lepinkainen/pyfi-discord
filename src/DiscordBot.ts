@@ -591,7 +591,7 @@ export class DiscordBot {
       .map((m) => `${m.author.username}: ${m.content}`)
       .join("\n");
 
-    const model = process.env.PROACTIVE_MODEL ?? "claude-opus-4-8";
+    const model = process.env.PROACTIVE_MODEL ?? "claude-sonnet-4-6";
     const system = directed
       ? [
           "You are a Discord chat bot. A user has directly @mentioned you and is asking you something.",

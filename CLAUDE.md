@@ -40,7 +40,7 @@ Note: external args are currently hardcoded to the `location` string option — 
 
 Required: `DISCORD_KEY`, `CLIENT_ID`, `GUILD_ID` (validated at startup).
 Optional (enable external commands): `LAMBDA_URL`, `LAMBDA_APIKEY`.
-Optional (enable proactive replies): `ANTHROPIC_API_KEY` + `PROACTIVE_CHANNELS` (comma-separated channel IDs). Tuning: `PROACTIVE_MODEL` (default `claude-opus-4-8`), `PROACTIVE_COOLDOWN_MS` (default `30000`), `PROACTIVE_DEBUG` (set to log gate/tool decisions), `PROACTIVE_WEB_SEARCH` (set to offer Claude the web-search tool — bills per search).
+Optional (enable proactive replies): `ANTHROPIC_API_KEY` + `PROACTIVE_CHANNELS` (comma-separated channel IDs). Tuning: `PROACTIVE_MODEL` (default `claude-sonnet-4-6`), `PROACTIVE_COOLDOWN_MS` (default `30000`), `PROACTIVE_DEBUG` (set to log gate/tool decisions), `PROACTIVE_WEB_SEARCH` (set to offer Claude the web-search tool — bills per search).
 Loaded from `.env` via dotenv.
 
 ### Proactive replies
