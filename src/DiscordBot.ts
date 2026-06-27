@@ -30,6 +30,11 @@ export class DiscordBot {
   private proactiveCooldowns: Map<string, number> = new Map();
   private static readonly PROACTIVE_PASS = "[[PASS]]";
   private static readonly PROACTIVE_MIN_LENGTH = 8;
+  // Drop retrieval hits below this cosine similarity — weak matches are usually
+  // noise that just invites the model to anchor on an irrelevant passage.
+  private static readonly RAG_MIN_SCORE = 0.3;
+  // Char budget for the joined search_rules payload fed back to Claude.
+  private static readonly RAG_RESULT_BUDGET = 4000;
 
   private client: Client = new Client({
     intents: [
@@ -555,14 +560,24 @@ export class DiscordBot {
         const query = String(input.query ?? "").trim();
         if (!query) return "Provide a query to search for.";
         const vec = await embedQuery(query);
-        const hits = search(dataset, vec, 8);
+        const hits = search(dataset, vec, 8).filter(
+          (h) => h.score >= DiscordBot.RAG_MIN_SCORE
+        );
         if (hits.length === 0) return `No matching passages in the ${dataset} knowledge base.`;
-        // Tag each hit with its similarity score so Claude can judge result
-        // quality and stop re-searching when the top hits are the best available.
-        return hits
-          .map((h) => `[p.${h.page} score=${h.score.toFixed(2)}] ${h.text}`)
-          .join("\n\n---\n\n")
-          .slice(0, 4000);
+        // Tag each hit with source + page (so multi-book datasets cite
+        // unambiguously) and its similarity score (so Claude can judge quality
+        // and stop re-searching). Accumulate whole hits up to a char budget
+        // instead of slicing the joined string — a blind slice can truncate a
+        // hit mid-sentence and strip its closing citation tag.
+        const out: string[] = [];
+        let budget = DiscordBot.RAG_RESULT_BUDGET;
+        for (const h of hits) {
+          const block = `[${h.source} p.${h.page} score=${h.score.toFixed(2)}] ${h.text}`;
+          if (out.length > 0 && block.length > budget) break;
+          out.push(block);
+          budget -= block.length;
+        }
+        return out.join("\n\n---\n\n");
       }
 
       if (name === "pyfibot") {
@@ -637,10 +652,17 @@ export class DiscordBot {
     const model = process.env.PROACTIVE_MODEL ?? "claude-sonnet-4-6";
 
     // Knowledge base linked to this channel, if any (and actually indexed).
-    const linked = datasetForChannel(message.channelId);
+    // In a thread the message carries the thread's own id, so fall back to the
+    // parent channel the dataset is actually mapped to.
+    const parentId =
+      "parentId" in message.channel ? message.channel.parentId : null;
+    const linked = datasetForChannel(message.channelId, parentId);
     const dataset = linked && datasetReady(linked) ? linked : undefined;
     const kbHint = dataset
-      ? ` This channel is about the "${dataset}" game; use the search_rules tool to answer rules/lore questions and cite page numbers (e.g. "(p.27)").`
+      ? ` This channel is about the "${dataset}" game. You have a search_rules tool backed by its rulebook. ` +
+        "Treat that rulebook as the ONLY authority: for any question about this game's rules, lore, or how something works, you MUST call search_rules first and base your answer solely on what it returns — never on prior knowledge or guesses. " +
+        'Cite the source and page for every claim, e.g. "(Pirate Borg, p.27)". ' +
+        "If search_rules returns nothing relevant, say the rulebook doesn't cover it rather than inventing an answer."
       : "";
 
     const system = directed
@@ -682,6 +704,12 @@ export class DiscordBot {
     const MAX_ITERS = 8;
     let response: Anthropic.Message | undefined;
 
+    // A direct question in a KB channel is almost always a rules/lore query, so
+    // force the model to ground its first move in the rulebook instead of
+    // letting it answer from priors (and hallucinate). Proactive (undirected)
+    // replies stay prompt-guided — most ambient chatter isn't a rules question.
+    const forceSearch = directed && !!dataset;
+
     try {
     for (let i = 0; i < MAX_ITERS; i++) {
       try {
@@ -690,6 +718,9 @@ export class DiscordBot {
           max_tokens: 2048,
           system,
           tools,
+          ...(forceSearch && i === 0
+            ? { tool_choice: { type: "tool", name: "search_rules" } }
+            : {}),
           messages,
         });
       } catch (error) {
