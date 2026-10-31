@@ -33,3 +33,14 @@ tasks:
       - task: deploy:files
       - task: deploy:install
       - task: deploy:restart
+
+  deploy-exe.dev:
+    desc: Deploy the bot to the exe.dev VM
+    deps: [build]
+    vars:
+      EXE_HOST: '{{.EXE_HOST | default "scholar-gateau.exe.xyz"}}'
+      EXE_PATH: '{{.EXE_PATH | default "workspace/pyfi-discord"}}'
+    cmds:
+      - rsync -avz --exclude '*.pdf' dist data package.json pnpm-lock.yaml pnpm-workspace.yaml .env {{.EXE_HOST}}:{{.EXE_PATH}}/
+      - ssh {{.EXE_HOST}} 'cd {{.EXE_PATH}} && PATH=$HOME/node/bin:$PATH pnpm install --frozen-lockfile'
+      - ssh {{.EXE_HOST}} 'sudo systemctl restart pyfi-discord && sleep 5 && systemctl is-active pyfi-discord'
